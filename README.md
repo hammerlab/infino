@@ -20,7 +20,7 @@ You can prepare more training data with [a protocol such as this, which includes
 
 3. Combine the training and test data, then run ComBat to perform batch correction. Barring any additional information about the provenance of your test data (and any additions you make to the training data), you can use at least two batches: one for the provided training data, and one for your separate test data.
 
-An example of batch correction is included in the two jupyter notebooks in this repo. They also demonstrate how to transform the batch-corrected data into the proper input format for Stan. 
+An example of batch correction is included in the two jupyter notebooks in this repo labeled "TCGA-KIRC". They also demonstrate how to transform the batch-corrected data into the proper input format for Stan. 
 
 4. Run [the infino model](https://github.com/hammerlab/immune-infiltrate-explorations/blob/master/model-single-origin-samples/models/model6.2_negbinom_matrix_correlation_features_oos_optim.stan), e.g.:
 
@@ -73,4 +73,7 @@ bash -c "cd work/model-single-origin-samples/run/ && python analyze_cut.py \
 --trace logs/tcgakirc_cut1_tpm_corrected/sampling_log.cohort.tcgakirc_cut1_tpm_corrected.txt_3.csv \
 ;"
 ```
+
+You can see example output from `analyze_cut.py` in `example analysis.ipynb`, which was used to generate the standalone python script.
+
 
