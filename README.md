@@ -1,6 +1,6 @@
 # *Infino*: a Bayesian hierarchical model improves estimates of immune infiltration into tumor microenvironment
 
-[Preprint (TODO)](#)
+[Preprint](https://www.biorxiv.org/content/early/2017/11/21/221671)
 
 ## Install
 
