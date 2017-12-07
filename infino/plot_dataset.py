@@ -4,26 +4,36 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-from . import CELL_TYPES, ROLLUPS
-from plot_settings import PlotSettings
+from . import CELL_TYPES, ROLLUPS, CIBERSORT_CELL_TYPES, CIBERSORT_ROLLUPS
+from . import plot_settings
 
 class PlotDataset:
     def __init__(self,
-                 key,
-                  trace_samples_df,
-                  cibersort_df,
-                  cibersort_rollup_df,
-                 plot_settings=None,
+                 sample_id,
+                 trace_samples_df,
+                 cibersort_df,
+                 cibersort_rollup_df,
+                 plot_settings=plot_settings.PlotSettings(),
                  rollups=ROLLUPS
                  ):
+        """
 
-        infino_vals = trace_samples_df[trace_samples_df['sample_id'] == key]
-        cibersort_vals_base = cibersort_df[CELL_TYPES].iloc[key - 1]
-        cibersort_vals_rolledup = cibersort_rollup_df.iloc[key - 1]
+        :param sample_id: Int [1, 10]
+        :param trace_samples_df: Output of stansummary_data.traces_to_dataset()
+        :param cibersort_df:
+        :param cibersort_rollup_df:
+        :param plot_settings:
+        :param rollups:
+        """
 
-        infino_vals = infino_vals.copy()  # because going to moplodify
+        infino_vals = trace_samples_df[trace_samples_df['sample_id'] == sample_id]
+
+        cibersort_vals_base = cibersort_df[CIBERSORT_CELL_TYPES].iloc[sample_id - 1]
+        cibersort_vals_rolledup = cibersort_rollup_df.iloc[sample_id - 1]
+
+        infino_vals = infino_vals.copy()  # because going to moodify
         infino_vals['supertype'] = infino_vals['subset_name'].apply(
-            lambda x: 'CD4 T' if 'CD4' in x else 'CD8 T' if 'CD8' in x else 'UNKNOWN' if 'unknown' else 'B')
+            lambda x: 'CD4 T' if 'CD4' in x else 'CD8 T' if 'CD8' in x else 'Unknown' if x=='Unknown' else 'B')
 
         map_row_to_ylevel = {}
         for k in rollups:
@@ -36,11 +46,11 @@ class PlotDataset:
         merged_grp = infino_vals
 
         # add cibersort points
-        cb_base = pd.DataFrame(self.cibersort_vals_base).reset_index()
+        cb_base = pd.DataFrame(cibersort_vals_base).reset_index()
         cb_base.columns = ['SubSet', 'estimate']
         cb_base['type'] = 'subset'
 
-        cb_rolledup = pd.DataFrame(self.cibersort_vals_rolledup).reset_index()
+        cb_rolledup = pd.DataFrame(cibersort_vals_rolledup).reset_index()
         cb_rolledup.columns = ['SubSet', 'estimate']
         cb_rolledup['type'] = 'rollup'
 
@@ -55,13 +65,146 @@ class PlotDataset:
         merged_grp2['ylevel_str'] = merged_grp2['ylevel'].apply(lambda x: chr(65 + x))
         merged_grp2['ylevel_str'].unique()
 
+        merged_grp2.fillna(0, inplace=True)
+
         self.plot_dataset = merged_grp2
 
-        self.plot_settings = PlotSettings() if plot_settings is None else plot_settings
+        self.plot_settings = plot_settings
+
+    def plot_violins(self):
+        with sns.plotting_context("talk"):
+            with sns.axes_style("white", rc={"axes.facecolor": (0, 0, 0, 0)}):
+                g = sns.FacetGrid(self.plot_dataset,
+                                  row="ylevel",  # subset_name
+                                  hue="subset_name",
+                                  col="supertype",
+                                  row_order=reversed(list(range(self.plot_dataset.ylevel.values.max() + 1))),
+                                  # row_order=hue_order,
+                                  hue_order=self.plot_settings.hue_order,
+                                  aspect=7,
+                                  size=1,
+                                  palette=self.plot_settings.built_pal_lighter2,
+                                  # sharex=True, # would force all xranges to be same, but we do this manually below
+                                  sharey=False  # important -- they don't share y ranges.
+                                  )
+
+                g.map_dataframe(sns.violinplot,
+                                x="estimate",
+                                y="ylevel_str",
+                                orient="h",
+                                # palette="Set3", # color comes in as "color" kwarg per map_dataframe source in axisgrid.py
+                                dodge=False,
+                                cut=0,
+                                bw=.2,
+                                scale='width',
+                                saturation=1,
+                                # see below, this isn't alpha. this just forces color to be plotted normally
+                                # alpha=.5, # doesn't do anything
+                                sharey=False,
+                                legend=False,
+                                clip_on=False,
+                                legend_out=False,
+                                )
+
+                def addcustompoint(x, y, lbl, c='red', s=100, zorder=10, **kwargs):
+                    kwargs.pop('color', None)
+                    kwargs.pop('label', None)
+                    try:  # some axes don't have any values
+                        plt.scatter(x=x.values[0],
+                                    y=0,
+                                    s=s,
+                                    c=c,
+                                    label=lbl,
+                                    zorder=zorder,
+                                    clip_on=False,
+                                    **kwargs
+                                    )
+                    except:
+                        pass
+
+                        #             g.map(addcustompoint, "gt", "ylevel_str", c=paired_colors[4], lbl='Ground Truth', marker=(5, 1), s=200, zorder=50, alpha=.8)
+
+                g.map(addcustompoint, "cb", "ylevel_str", c=self.plot_settings.paired_colors[6], lbl='Cibersort', alpha=.8)
+
+                g.map(plt.axhline, y=0, lw=2, clip_on=False, ls='dashed')
+
+                def label(*args, **kwargs):
+                    """
+                    args[0] is a Series that corresponds to this facet. it will have values "subset" or "rollup"
+                    kwargs is e.g.: {'color': (0.4918017777777778, 0.25275644444444445, 0.3333333333333333), 'label': 'CD4 Treg'}
+                    use estimate (args[1]) to find median. put rollup label on left/right based on that
+                    """
+                    # print(args)
+                    # print(kwargs)
+                    type_of_label = args[0].values[0]
+                    color = np.array(kwargs['color'])
+
+                    # DARKEN COLOR
+                    color /= self.plot_settings.color_lightening_coeff
+                    color.clip(0, 1)
+
+                    label = kwargs['label']
+                    estimate_median = args[1].median()
+                    ax = plt.gca()  # map() changes current axis a ton
+                    if type_of_label == 'rollup':
+                        plot_on_right = (estimate_median <= .5)
+                        ax.text(
+                            1 if plot_on_right else 0,
+                            .2,
+                            label + " (sum)" if label is not "Unknown" else label,  # label,
+                            fontweight="bold",
+                            color=color,
+                            ha="right" if plot_on_right else "left",
+                            va="center", transform=ax.transAxes,
+                            fontsize='x-large',  # 15,
+                            bbox=dict(facecolor='yellow', alpha=0.3)
+                        )
+                    else:
+                        ax.text(1, .2,
+                                label,
+                                fontweight="bold",
+                                color=color,
+                                ha="right", va="center", transform=ax.transAxes
+                                )
+
+                g.map(label, "type_x", "estimate")
+
+                g.set(xlim=(0, 1))
+
+                # Remove axes details that don't play will with overlap
+                g.set_titles("")
+                # g.set_titles(col_template="{col_name}", row_template="")
+                g.set(yticks=[], ylabel='')
+                g.despine(bottom=True, left=True)
+
+                # fix x axis
+                g.set_xlabels('Mixture proportion')
+
+                # legend
+                handles, labels = g.fig.gca().get_legend_handles_labels()
+                chosen_labels_idx = [
+                    # labels.index('Ground Truth'),
+                    labels.index('Cibersort')
+                ]
+                legend = g.fig.gca().legend([handles[i] for i in chosen_labels_idx],
+                                            [labels[i] for i in chosen_labels_idx],
+                                            loc='upper right',
+                                            frameon=True,
+                                            bbox_to_anchor=(0, -0.1, 1, 1),
+                                            bbox_transform=g.fig.transFigure
+                                            )
+                # without bbox_to_anchor this gets applied to upper right of the last axis, which is the CD8 T cell bottommost facet
+                frame = legend.get_frame()
+                frame.set_edgecolor(self.plot_settings.built_palette[0])
+                frame.set_facecolor('white')
+
+                # tighten
+                g.fig.tight_layout()
+
+                return g, g.fig
 
 
-
-    def plot_mcmc_areas(self, relative_to_groundtruth=False):
+    def plot_mcmc_areas(self, relative_to_groundtruth=False,  ):
         """
         plot MCMC areas, perhaps relative_to_groundtruth if flag enabled
         feed in output of merge_datasets_for_plots(mixID)
@@ -119,7 +262,7 @@ class PlotDataset:
                         ax.text(
                             1 if plot_on_right else 0,
                             .2,
-                            label + " (sum)",  # label,
+                            label + " (sum)" if not "Unknown" else label,  # label,
                             fontweight="bold",
                             color=color,
                             ha="right" if plot_on_right else "left",

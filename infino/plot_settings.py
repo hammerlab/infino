@@ -12,7 +12,7 @@ class PlotSettings:
 
         hue_order = []
         built_palette = []
-        for r, start in zip(list(rollups), range(0, 3)):
+        for r, start in zip(list(rollups), range(0, len(rollups.keys()))):
             hue_order.extend(rollups[r])
             hue_order.append(r)
             full_pal = sns.cubehelix_palette(len(rollups[r]) + 3,
@@ -30,6 +30,6 @@ class PlotSettings:
         self.hue_order = hue_order
         self.paired_colors = paired_colors
 
-        color_lightening_coeff = 1.2
-        built_pal_lighter2 = [(np.array(i) * color_lightening_coeff).clip(0, 1) for i in built_palette]
-        sns.palplot(built_pal_lighter2)
+        self.color_lightening_coeff = 1.2
+        self.built_pal_lighter2 = [(np.array(i) * self.color_lightening_coeff).clip(0, 1) for i in self.built_palette]
+        #sns.palplot(built_pal_lighter2)

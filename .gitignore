@@ -1,3 +1,4 @@
 .idea
 infino/.idea
 */.ipynb_checkpoints
+infino/__pycache__/

@@ -2,25 +2,45 @@ import numpy as np
 import pandas as pd
 import re
 
-from . import config
+from . import CELL_TYPES, ROLLUPS, STAN_PARAMETER_NAMES
 
-from config import CELL_TYPES, ROLLUPS
+def get_trace_columns(parameters_list, stan_summary):
+    """
 
-def get_trace_columns(parameter, stan_summary):
-    cols_we_want = stan_summary[stan_summary.name.str.startswith(parameter)].name.values
+    :param parameters_list:
+    :param stan_summary:
+    :return:
+    """
+    cols_we_want = []
+    for parameter in parameters_list:
+        cols_we_want.extend(stan_summary[stan_summary.name.str.startswith(parameter)].name.values)
+
     trace_columns = [c.replace('[', '.').replace(']', '').replace(',', '.') for c in cols_we_want]
     return trace_columns
 
 
-# From the traces, get `merged_samples`
-def traces_to_dataset(trace_filenames_list, 
-                      trace_columns, 
-                     warmup, 
+def traces_to_dataset(trace_filenames_list,
                       stan_summary,
-                     rollups=ROLLUPS,                       
-                     cell_types=CELL_TYPES, 
-                     logging=True):
-    
+                      parameters=STAN_PARAMETER_NAMES,
+                      warmup=0,
+                      rollups=ROLLUPS,
+                      cell_types=CELL_TYPES,
+                      logging=True):
+    """
+    Combines all trace csv's and the stansummary csv for the parameters of interest
+
+    :param trace_filenames_list:
+    :param parameters_list:
+    :param warmup:
+    :param stan_summary: DataFrame
+    :param rollups: dict of rollups mapping to cell_types
+    :param cell_types: list of cell type names that corresponds to cibersort names
+    :param logging: boolean
+    :return: Returns DataFrame with columns: sample_id, combined_iter_number, subset_name, estimate, type
+    """
+
+    trace_columns = get_trace_columns(parameters.values(), stan_summary)
+
     all_traces_list = []
     
     cell_types = np.array(cell_types)
@@ -34,15 +54,18 @@ def traces_to_dataset(trace_filenames_list,
     all_traces_df = pd.concat(all_traces_list)
     
     # Munge all_traces_df 
-    
-    all_traces_df2 = pd.melt(all_traces_df, id_vars=['iter','trace_id'], value_name='estimate', var_name='variable')
-    var_ids = all_traces_df2.variable.str.extract('sample2_x.(?P<sample_id>\d+).(?P<subset_id>\d+)')
+    cell_types_prefix = parameters['cell_types_prefix']
+    unknown_prefix = parameters['unknown_prefix']
 
-    all_traces_df3= pd.concat([all_traces_df2, var_ids], axis=1) 
+    all_traces_df2 = pd.melt(all_traces_df, id_vars=['iter','trace_id'], value_name='estimate', var_name='variable')
+    cell_var_ids = all_traces_df2.variable.str.extract(cell_types_prefix + '.(?P<sample_id>\d+).(?P<subset_id>\d+)')
+    print(cell_var_ids)
+    all_traces_df3 = pd.concat([all_traces_df2, cell_var_ids], axis=1)
     all_traces_df3['subset_id'] = all_traces_df3['subset_id'].astype(int)
     all_traces_df3['sample_id'] = all_traces_df3['sample_id'].astype(int)
 
-    sample2_xs = stan_summary[stan_summary['name'].str.startswith('sample2_x')]['Mean'].values.reshape(all_traces_df3.sample_id.max(), all_traces_df3.subset_id.max()) # (10,13) before
+    sample2_xs = stan_summary[stan_summary['name'].str.startswith(cell_types_prefix)]['Mean'].values.reshape(all_traces_df3.sample_id.max(), all_traces_df3.subset_id.max())
+
 
     ## Edit this - include the unknown prop? 
     mixture_estimates = pd.DataFrame(sample2_xs, columns=cell_types)
@@ -89,8 +112,20 @@ def traces_to_dataset(trace_filenames_list,
     merged_samples_2.columns = [c.replace('rollup', 'subset_name') for c in merged_samples_2.columns]
     merged_samples_2['type'] = 'rollup'
     merged_samples = pd.concat([merged_samples_1, merged_samples_2])
-    
-    return merged_samples
+
+    ### unknown prop df
+    df2 = pd.melt(all_traces_df, id_vars=['iter', 'trace_id'], value_name='estimate', var_name='variable')
+
+    unknown_var_ids = df2.variable.str.extract('unknown_prop' + '.(?P<sample_id>\d+)')
+    df3 = pd.concat([df2, unknown_var_ids], axis=1)
+    df3['combined_iter_number'] = df3['iter'] + df3['trace_id'] * 1000
+    df3['subset_name'] = pd.Series(['Unknown'] * len(df3))
+    df3['type'] = pd.Series(['rollup'] * len(df3))
+    unknowns_merged_samples = df3[['sample_id', 'combined_iter_number', 'subset_name', 'estimate', 'type']]
+
+    all_merged_samples = pd.concat([merged_samples, unknowns_merged_samples])
+
+    return all_merged_samples
 
 def label_rollup(rollups, x):
     for key in rollups.keys():
