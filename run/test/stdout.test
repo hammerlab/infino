@@ -1,0 +1,4 @@
+('hi\n', '')
+('to stdout\n', 'to stderr\n')
+('', '')
+('', '')
