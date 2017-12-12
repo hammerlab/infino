@@ -7,6 +7,7 @@ import numpy as np
 from . import CELL_TYPES, ROLLUPS, CIBERSORT_CELL_TYPES, CIBERSORT_ROLLUPS
 from . import plot_settings
 
+
 class PlotDataset:
     def __init__(self,
                  sample_id,
@@ -70,6 +71,7 @@ class PlotDataset:
         self.plot_dataset = merged_grp2
 
         self.plot_settings = plot_settings
+
 
     def plot_violins(self):
         with sns.plotting_context("talk"):
@@ -204,7 +206,7 @@ class PlotDataset:
                 return g, g.fig
 
 
-    def plot_mcmc_areas(self, relative_to_groundtruth=False,  ):
+    def plot_mcmc_areas(self, relative_to_groundtruth=False):
         """
         plot MCMC areas, perhaps relative_to_groundtruth if flag enabled
         feed in output of merge_datasets_for_plots(mixID)
@@ -414,6 +416,6 @@ class PlotDataset:
                 return g, g.fig
 
 
-
+    # TODO: dendrogram & correlation matrix
 
         

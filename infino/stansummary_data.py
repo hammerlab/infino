@@ -57,30 +57,33 @@ def traces_to_dataset(trace_filenames_list,
     cell_types_prefix = parameters['cell_types_prefix']
     unknown_prefix = parameters['unknown_prefix']
 
-    all_traces_df2 = pd.melt(all_traces_df, id_vars=['iter','trace_id'], value_name='estimate', var_name='variable')
-    cell_var_ids = all_traces_df2.variable.str.extract(cell_types_prefix + '.(?P<sample_id>\d+).(?P<subset_id>\d+)')
-    print(cell_var_ids)
-    all_traces_df3 = pd.concat([all_traces_df2, cell_var_ids], axis=1)
-    all_traces_df3['subset_id'] = all_traces_df3['subset_id'].astype(int)
-    all_traces_df3['sample_id'] = all_traces_df3['sample_id'].astype(int)
+    #cell_types_df = all_traces_df[all_traces_df.variable.startswith(cell_types_prefix)]
+    all_traces_melted = pd.melt(all_traces_df, id_vars=['iter','trace_id'], value_name='estimate', var_name='variable')
 
-    sample2_xs = stan_summary[stan_summary['name'].str.startswith(cell_types_prefix)]['Mean'].values.reshape(all_traces_df3.sample_id.max(), all_traces_df3.subset_id.max())
+    cell_traces_df = all_traces_melted[all_traces_melted.variable.str.startswith(cell_types_prefix)]
+    unknown_traces_df = all_traces_melted[all_traces_melted.variable.str.startswith(unknown_prefix)]
 
+    cell_var_ids = cell_traces_df.variable.str.extract(cell_types_prefix + '.(?P<sample_id>\d+).(?P<subset_id>\d+)')
+    #print(cell_var_ids)
+    cell_traces_df3 = pd.concat([cell_traces_df, cell_var_ids], axis=1)
+    cell_traces_df3['subset_id'] = cell_traces_df3['subset_id'].astype(int)
+    cell_traces_df3['sample_id'] = cell_traces_df3['sample_id'].astype(int)
 
-    ## Edit this - include the unknown prop? 
-    mixture_estimates = pd.DataFrame(sample2_xs, columns=cell_types)
+    sample2_xs = stan_summary[stan_summary['name'].str.startswith(cell_types_prefix)]['Mean'].values.reshape(cell_traces_df3.sample_id.max(), cell_traces_df3.subset_id.max())
+
+    from . import CIBERSORT_CELL_TYPES
+    mixture_estimates = pd.DataFrame(sample2_xs, columns=np.array(CIBERSORT_CELL_TYPES))
     
     subset_names = [re.sub(string=x, pattern='(.*)\[(.*)\]', repl='\\2') for x in mixture_estimates.columns]
-    
-    all_traces_df3['subset_name'] = all_traces_df3.subset_id.apply(lambda i: subset_names[i-1])
-    
-        
+
+    cell_traces_df3['subset_name'] = cell_traces_df3.subset_id.apply(lambda i: subset_names[i-1])
+
     # Warmup
     if logging:
         print("Pre-warmup")
-        print(all_traces_df3.iter.describe()[['min', 'max']])
+        print(cell_traces_df3.iter.describe()[['min', 'max']])
     
-    all_traces_df3 = all_traces_df3.loc[all_traces_df3['iter']>=warmup,]
+    all_traces_df3 = cell_traces_df3.loc[cell_traces_df3['iter'] >= warmup,]
     all_traces_df3['iter'] -= warmup
 
     if logging:
@@ -114,14 +117,18 @@ def traces_to_dataset(trace_filenames_list,
     merged_samples = pd.concat([merged_samples_1, merged_samples_2])
 
     ### unknown prop df
-    df2 = pd.melt(all_traces_df, id_vars=['iter', 'trace_id'], value_name='estimate', var_name='variable')
 
-    unknown_var_ids = df2.variable.str.extract('unknown_prop' + '.(?P<sample_id>\d+)')
-    df3 = pd.concat([df2, unknown_var_ids], axis=1)
+    #unknown_traces_df = all_traces_df[all_traces_df.variable.startswith(unknown_prefix)]
+    #unknown_traces_df = pd.melt(unknown_traces_df, id_vars=['iter', 'trace_id'], value_name='estimate', var_name='variable')
+
+    unknown_var_ids = unknown_traces_df.variable.str.extract('unknown_prop' + '.(?P<sample_id>\d+)')
+    df3 = pd.concat([unknown_traces_df, unknown_var_ids], axis=1)
     df3['combined_iter_number'] = df3['iter'] + df3['trace_id'] * 1000
-    df3['subset_name'] = pd.Series(['Unknown'] * len(df3))
-    df3['type'] = pd.Series(['rollup'] * len(df3))
+    df3.loc[:, 'subset_name'] = 'Unknown'
+    df3.loc[:, 'type'] = 'Unknown'
+    df3.loc[:, 'sample_id'] = df3['sample_id'].astype(int)
     unknowns_merged_samples = df3[['sample_id', 'combined_iter_number', 'subset_name', 'estimate', 'type']]
+    #unknowns_merged_samples['sample_id'] = unknowns_merged_samples['sample_id'].astype(int)
 
     all_merged_samples = pd.concat([merged_samples, unknowns_merged_samples])
 
