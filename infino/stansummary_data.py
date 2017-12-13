@@ -57,7 +57,6 @@ def traces_to_dataset(trace_filenames_list,
     cell_types_prefix = parameters['cell_types_prefix']
     unknown_prefix = parameters['unknown_prefix']
 
-    #cell_types_df = all_traces_df[all_traces_df.variable.startswith(cell_types_prefix)]
     all_traces_melted = pd.melt(all_traces_df, id_vars=['iter','trace_id'], value_name='estimate', var_name='variable')
 
     cell_traces_df = all_traces_melted[all_traces_melted.variable.str.startswith(cell_types_prefix)]
@@ -76,37 +75,36 @@ def traces_to_dataset(trace_filenames_list,
     
     subset_names = [re.sub(string=x, pattern='(.*)\[(.*)\]', repl='\\2') for x in mixture_estimates.columns]
 
-    cell_traces_df3['subset_name'] = cell_traces_df3.subset_id.apply(lambda i: subset_names[i-1])
+    cell_traces_df3['subset_name'] = cell_traces_df3.subset_id.apply(lambda x: subset_names[x-1])
 
-    # Warmup
+    # Drop the warmup samples
     if logging:
         print("Pre-warmup")
         print(cell_traces_df3.iter.describe()[['min', 'max']])
     
-    all_traces_df3 = cell_traces_df3.loc[cell_traces_df3['iter'] >= warmup,]
-    all_traces_df3['iter'] -= warmup
+    cell_traces_post_warmup = cell_traces_df3.loc[cell_traces_df3['iter'] >= warmup,]
+    cell_traces_post_warmup['iter'] -= warmup
 
     if logging:
         print("Post-warmup")
-        print(all_traces_df3.iter.describe()[['min', 'max']])
+        print(cell_traces_post_warmup.iter.describe()[['min', 'max']])
     
-    num_samples = all_traces_df3.iter.max() + 1
+    num_samples = cell_traces_post_warmup.iter.max() + 1
     
     # combine iteration numbers across traces -- i.e. line them up from 0 to 4000, not 4 versions of 0 to 1000
-    #(all_traces_df3['trace_id']*1000 + all_traces_df3['iter']).hist()
-    (all_traces_df3['trace_id']*num_samples + all_traces_df3['iter']).describe()[['min', 'max']]
+    (cell_traces_post_warmup['trace_id']*num_samples + cell_traces_post_warmup['iter']).describe()[['min', 'max']]
     
-    all_traces_df3['combined_iter_number'] = (all_traces_df3['trace_id']*num_samples + all_traces_df3['iter'])
+    cell_traces_post_warmup['combined_iter_number'] = (cell_traces_post_warmup['trace_id']*num_samples + cell_traces_post_warmup['iter'])
     
-    assert all_traces_df3.shape[0] / all_traces_df3.sample_id.max() / all_traces_df3.subset_id.max() / 4 == num_samples
+    assert cell_traces_post_warmup.shape[0] / cell_traces_post_warmup.sample_id.max() / cell_traces_post_warmup.subset_id.max() / 4 == num_samples
     
     # Add rollup column
     
-    all_traces_df3['rollup'] = all_traces_df3.subset_name.apply(lambda x: label_rollup(rollups, x))
+    cell_traces_post_warmup['rollup'] = cell_traces_post_warmup.subset_name.apply(lambda x: label_rollup(rollups, x))
     
-    samples_rolledup = all_traces_df3.groupby(['sample_id', 'combined_iter_number', 'rollup']).estimate.sum().reset_index()
+    samples_rolledup = cell_traces_post_warmup.groupby(['sample_id', 'combined_iter_number', 'rollup']).estimate.sum().reset_index()
     
-    cleaner_traces = all_traces_df3.copy()
+    cleaner_traces = cell_traces_post_warmup.copy()
     cleaner_traces['subset_name'] = cleaner_traces['subset_name'].str.replace('_', ' ')
     
     merged_samples_1 = cleaner_traces[['sample_id', 'combined_iter_number', 'subset_name', 'estimate']].copy()
@@ -118,17 +116,17 @@ def traces_to_dataset(trace_filenames_list,
 
     ### unknown prop df
 
-    #unknown_traces_df = all_traces_df[all_traces_df.variable.startswith(unknown_prefix)]
-    #unknown_traces_df = pd.melt(unknown_traces_df, id_vars=['iter', 'trace_id'], value_name='estimate', var_name='variable')
-
     unknown_var_ids = unknown_traces_df.variable.str.extract('unknown_prop' + '.(?P<sample_id>\d+)')
     df3 = pd.concat([unknown_traces_df, unknown_var_ids], axis=1)
-    df3['combined_iter_number'] = df3['iter'] + df3['trace_id'] * 1000
-    df3.loc[:, 'subset_name'] = 'Unknown'
-    df3.loc[:, 'type'] = 'Unknown'
-    df3.loc[:, 'sample_id'] = df3['sample_id'].astype(int)
-    unknowns_merged_samples = df3[['sample_id', 'combined_iter_number', 'subset_name', 'estimate', 'type']]
-    #unknowns_merged_samples['sample_id'] = unknowns_merged_samples['sample_id'].astype(int)
+
+    unknown_traces_post_warmup = df3.loc[df3['iter'] >= warmup,]
+    unknown_traces_post_warmup['iter'] -= warmup
+
+    unknown_traces_post_warmup['combined_iter_number'] = unknown_traces_post_warmup['iter'] + unknown_traces_post_warmup['trace_id'] * num_samples
+    unknown_traces_post_warmup.loc[:, 'subset_name'] = 'Unknown'
+    unknown_traces_post_warmup.loc[:, 'type'] = 'Unknown'
+    unknown_traces_post_warmup.loc[:, 'sample_id'] = unknown_traces_post_warmup['sample_id'].astype(int)
+    unknowns_merged_samples = unknown_traces_post_warmup[['sample_id', 'combined_iter_number', 'subset_name', 'estimate', 'type']]
 
     all_merged_samples = pd.concat([merged_samples, unknowns_merged_samples])
 

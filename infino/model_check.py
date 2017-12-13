@@ -2,17 +2,16 @@
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import numpy as np
 
 def plot_stan_summary_metric(stan_summary, metric, parameter, title=None, figure_save_path=None):
     """
-
-    :param stan_summary:
-    :param metric:
-    :param parameter:
-    :param title:
-    :param figure_save_path:
-    :return:
+    :param stan_summary: DataFrame of the stansummary csv
+    :param metric: one of ["R_hat", "MCSE", "N_Eff", 'StdDev']
+    :param parameter: name of stan parameter to check, e.g. 'unknown_prop'
+    :param title: title for figure
+    :param figure_save_path: directory
+    :return: plots the figure inline, optionally saves
     """
     f = plt.figure()
     sns.distplot(stan_summary[stan_summary.name.str.startswith(parameter)][metric])
@@ -28,21 +27,28 @@ def plot_stan_summary_metric(stan_summary, metric, parameter, title=None, figure
         savefig(f, figure_save_path, dpi=300)
 
 
-def analyze_mcse(stan_summary, parameter_name):
+def analyze_mcse(stan_summary, parameter, title=None, figure_save_path=None):
     """
     E.g. [analyze_mcse(stan_summary, parameter) for parameter in parameters]
     :param stan_summary:
-    :param parameter_name:
+    :param parameter:
     :return:
     """
-    parameter_df = stan_summary[stan_summary.name.str.startswith(parameter_name)]
+    parameter_df = stan_summary[stan_summary.name.str.startswith(parameter)]
 
     ratio = parameter_df['MCSE'] / parameter_df['StdDev']
     print(ratio.describe())
 
     f = plt.figure(figsize=(18,8))
-    plt.scatter(x=range(len(ratio)), y=ratio, s=1)
-    plt.title("%s: Ratio of MCSE to posterior standard deviation" % parameter_name)
+    sns.regplot(np.array(range(len(ratio))), ratio, fit_reg=False)
+
+    if title is None:
+        plt.title('MCSE/StdDev ratio of {}'.format(parameter))
+    else:
+        plt.title(title)
+
+    if figure_save_path is not None:
+        savefig(f, figure_save_path, dpi=300)
 
 
 def savefig(fig, *args, **kwargs):
