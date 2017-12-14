@@ -4,11 +4,15 @@ import matplotlib
 matplotlib.use('Agg')
 
 from pystan.misc import stan_rdump
+from pystan.constants import MAX_UINT
+import random
 import numpy as np
 import pandas as pd
 import subprocess
 import argparse
 import models
+
+# import pdb; pdb.set_trace()
 
 
 def make_training_stan_dict(df, map_sample_to_subset):
@@ -89,19 +93,21 @@ def make_test_stan_dict(df, map_gene_name_to_id):
 
 
 # based on pystan documentation
-generate_seed = lambda : random.randint(0, pystan.constants.MAX_UINT)
+generate_seed = lambda : random.randint(0, MAX_UINT)
 
 
 def generate_chain_command(**kwargs):
     sample_log_fname = "{experiment_name}.samples.{chain_id}.csv".format(**kwargs)
     stdout_fname = "{experiment_name}.stdout.{chain_id}.txt".format(**kwargs)
+    seed_fname = "{experiment_name}.seed.{chain_id}.txt".format(**kwargs) # output seed for reproducibility
+    kwargs['output_fname'] = sample_log_fname
     command_template = """
         echo {modelexe} method=sample num_samples=1000 num_warmup=1000 save_warmup=0 thin=1 \\
         random seed={seed} \\
-        id={chain_id} data file={} \\
-        output file={sample_log_fname} refresh=25
-        """.format(**kwargs).format(output_fname=sample_log_fname)
-    return command_template, sample_log_fname, stdout_fname
+        id={chain_id} data file={data_fname} \\
+        output file={output_fname} refresh=25
+        """.format(**kwargs)
+    return command_template, sample_log_fname, stdout_fname, seed_fname
 
 
 def announce_progress(progress_str, log_file_handler, chain_id):
@@ -153,24 +159,35 @@ if __name__ == '__main__':
     train_dict.update(test_dict)
 
     # convert to Rdump
-    pystan.misc.stan_rdump(train_dict, args.output_name + '.standata.Rdump')
+    for key in train_dict.keys():
+        # stan_rdump requires ndarray/matrix rather than pandas dataframes
+        # affects keys including: 'x', 'cell_features'
+        if type(train_dict[key]) == pd.DataFrame:
+            train_dict[key] = train_dict[key].as_matrix()
+
+    data_fname = args.output_name + '.standata.Rdump'
+    stan_rdump(train_dict, data_fname)
 
 
     # generate commands to run and files to write to
     chains = []
-    for i in range(n_chains):
-        command, sample_log_fname, stdout_fname = generate_chain_command(
-            seed=generate_seed(),
+    for i in range(args.n_chains):
+        seed = generate_seed()
+        command, sample_log_fname, stdout_fname, seed_fname = generate_chain_command(
+            seed=seed,
             experiment_name=args.output_name,
             chain_id=i+1,
             modelexe = args.model_executable,
-            sample_log_fname = args.output_name + '.samples.log'
+            sample_log_fname = args.output_name + '.samples.log',
+            data_fname = data_fname
         )
         chains.append({
                 'chain_id': i+1,
                 'command': command, 
                 'sample_log': sample_log_fname,
-                'stdout_log': stdout_fname
+                'stdout_log': stdout_fname,
+                'seed': seed,
+                'seed_fname': seed_fname
             }
         )
 
@@ -186,6 +203,9 @@ if __name__ == '__main__':
         )
         chain['proc'] = proc
         chain['stdout_file_handler'] = open(chain['stdout_log'], 'w')
+        # output seed for reproducibility
+        with open(chain['seed_fname'], 'w') as seed_f:
+            seed_f.write(chain['seed'])
 
     # monitor progress, write to stdout and console log file
     while any(chain['proc'].returncode is None for chain in chains):
@@ -210,7 +230,10 @@ if __name__ == '__main__':
         # close out the file handler
         chain['stdout_file_handler'].close()
 
-    # TODO: run stansummary: sample log filenames are available in chains object.
+    ## run stansummary
+    # sample log filenames are available in chains object.
+    # since we got here, all chains must have written proper logs -- so we will avoid the bug of stansummary erroring out in the case of broken chains
+    # TODO
 
     # TODO: print timing details from end of chain sampling log files?
 
