@@ -8,7 +8,7 @@ def _chunks(l, n):
     https://stackoverflow.com/a/312464/130164
     """
     for i in range(0, len(l), n):
-        yield l[i:i + n]
+        yield list(l[i:i + n]) # convert from ndarray to list if ndarray
 
 
 def chunker(input_name, output_fname_template, pagesize, min_group_size=1):
@@ -23,8 +23,9 @@ def chunker(input_name, output_fname_template, pagesize, min_group_size=1):
     if len(chunks) > 1 and len(chunks[-1]) < min_group_size:
         # stick those samples in other chunks
         for sample in chunks[-1]:
-            destination_chunk = np.random.choice(chunks[:-1], 1)
-            destination_chunk.append(sample)
+            # destination_chunk = np.random.choice(chunks[:-1], 1) # argument to choice must be one-dimensional, so can't just pass chunks[:-1]
+            destination_chunk_ix = np.random.randint(0, len(chunks) - 1) # rand int between 0 (inclusive) and len(chunks)-1 (exclusive)
+            chunks[destination_chunk_ix].append(sample)
         chunks = chunks[:-1]  # remove last chunk
 
     # confirm our manipulation didn't destroy anything
