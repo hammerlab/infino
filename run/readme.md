@@ -10,3 +10,5 @@ docker run -it --rm -v $(pwd):/home/jovyan/work hammerlab/infino-docker:latest b
 
 
 > python chunker.py --data private_data/cohort_tcgakirc.cibersort.input.reference.datatype_tpm_corrected.txt --output_file testout --pagesize 30 --min_chunk_size 10
+
+Create executable version of `modelname.stan`: `make -C $HOME/cmdstan $(pwd)/modelname`. Creates `modelname` executable. May need to clear out manually to force make rerun: `rm modelname.hpp modelname`
