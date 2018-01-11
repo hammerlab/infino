@@ -1,0 +1,2 @@
+[Chain 3] ('../model6.5_negbinom_matrix_correlation_features_oos_optim_otherbucket_samplevariance method=sample num_samples=1000 num_warmup=1000 save_warmup=0 thin=1 random seed=619473603 id=3 data file=out/experiment_rcc.test.chunked.chunk-1-of-2.model6_5.standata.Rdump output file=out/experiment_rcc.test.chunked.chunk-1-of-2.model6_5.samples.3.csv refresh=25\n', '')
+[Chain 3] Execution completed, return code: 0

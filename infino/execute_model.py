@@ -153,7 +153,7 @@ def main():
     parser.add_argument('--train_xdata', required=True, help='map from training samples to subsets (xdata design matrix')
     parser.add_argument('--train_cellfeatures', required=True, help='cell features matrix')
     parser.add_argument('--test_samples', required=True, help='test matrix filename (to be deconvolved)')
-    parser.add_argument('--n_chains', default=4, help='number of MCMC chains')
+    parser.add_argument('--n_chains', default=4, type=int, help='number of MCMC chains')
     parser.add_argument('--output_name', required=True, help='prefix for output files (include chunk number here!)')
     parser.add_argument('--model_executable', required=True, help='compiled stan model')
     parser.add_argument('--dry_run', action='store_true', default=False, help="don't run expensive stan fit commands, but do everything else")
@@ -175,7 +175,7 @@ def main():
     test_df = pd.read_csv(args.test_samples, index_col=0, sep='\t')
 
     # confirm that train and test expression have exactly the same genes
-    assert len(set(train_df.index.values).symmetric_difference(set(test_df.index.values))) == 0
+    assert len(set(train_df.index.values).symmetric_difference(set(test_df.index.values))) == 0, "Train and test MUST have exactly the same genes!"
 
     # create stan data dicts, recoding sample IDs
     train_dict, map_gene_name_to_id = make_training_stan_dict(train_df, xdata, cell_features)
@@ -234,7 +234,7 @@ def main():
         chain['stdout_file_handler'] = open(chain['stdout_log'], 'w')
         # output seed for reproducibility
         with open(chain['seed_fname'], 'w') as seed_f:
-            seed_f.write(chain['seed'])
+            seed_f.write(str(chain['seed']))
 
     # monitor progress, write to stdout and console log file
     while any(chain['proc'].returncode is None for chain in chains):
@@ -263,7 +263,7 @@ def main():
     # sample log filenames are available in chains object.
     # since we got here, all chains must have written proper logs -- so we will avoid the bug of stansummary erroring out in the case of broken chains
     stansummary(
-        output_fname="{experiment_name}.stansummary.csv".format(experiment_name=args.output_fname),
+        output_fname="{experiment_name}.stansummary.csv".format(experiment_name=args.output_name),
         input_names=[chain['sample_log'] for chain in chains],
         dry_run=args.dry_run
     )
