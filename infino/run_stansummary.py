@@ -4,6 +4,7 @@ import subprocess
 
 def stansummary(output_fname, input_names):
     input_names_concat = ' '.join(input_names)
+    # TODO: remove the "echo"
     command = """echo stansummary --csv_file={output_fname} {input_names_concat} > /dev/null;""".format(
         output_fname=output_fname,
         input_names_concat=input_names_concat

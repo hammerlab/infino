@@ -123,6 +123,7 @@ def generate_chain_command(**kwargs):
     stdout_fname = "{experiment_name}.stdout.{chain_id}.txt".format(**kwargs)
     seed_fname = "{experiment_name}.seed.{chain_id}.txt".format(**kwargs) # output seed for reproducibility
     kwargs['output_fname'] = sample_log_fname
+    # TODO: remove "echo"
     command_template = """
         echo {modelexe} method=sample num_samples=1000 num_warmup=1000 save_warmup=0 thin=1 \\
         random seed={seed} \\
@@ -205,7 +206,6 @@ def main():
             experiment_name=args.output_name,
             chain_id=i+1,
             modelexe = args.model_executable,
-            sample_log_fname = args.output_name + '.samples.log',
             data_fname = data_fname
         )
         chains.append({
@@ -260,7 +260,10 @@ def main():
     ## run stansummary
     # sample log filenames are available in chains object.
     # since we got here, all chains must have written proper logs -- so we will avoid the bug of stansummary erroring out in the case of broken chains
-    # TODO
+    stansummary(
+        output_fname="{experiment_name}.stansummary.csv".format(experiment_name=args.output_fname),
+        input_names=[chain['sample_log'] for chain in chains]
+    )
 
     # TODO: print timing details from end of chain sampling log files?
 
