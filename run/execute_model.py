@@ -10,28 +10,43 @@ import numpy as np
 import pandas as pd
 import subprocess
 import argparse
-import models
 
 # import pdb; pdb.set_trace()
 
 
-def make_training_stan_dict(df, map_sample_to_subset):
+def make_training_stan_dict(df, sample_x_matrix, cell_features):
     """
-    input: genes x samples dataframe; a mapping from sample name to subset
+    @param df: genes x samples dataframe. must have sample names header row.
+    @param sample_x_matrix: an x_data design matrix (samples x subsets) that indicates fractional presence of all subsets within each sample. 
+    @param cell_features: subsets x markers dataframe (values are 0 or 1 for absense / presence of marker for a certain cell type)
     returns: training part of stan dictionary
     """
-    # columns that models.prep_stan_data expects: new_sample_id; new_gene_id (not gene_name); est_counts; SubSet
-    # TODO: how to get cell features in there? doesn't seem like we have so far
+
+    # melt the G x S dataframe 
     tmp_df = df.reset_index() # this takes gene_name into first columnn
     training_df = pd.melt(
         tmp_df, 
         id_vars=tmp_df.columns[0],
         var_name='sample_name', # might not be an int
-        value_name='est_counts' # this is what models.prep_stan_data expects; not necessarily raw counts
+        value_name='est_counts' # this name is carried over from what models.prep_stan_data expected; not necessarily raw counts!!
     ).rename(columns={'index': 'gene_name'})
 
-    # map sample names to subsets
-    training_df['SubSet'] = training_df['sample_name'].apply(lambda x: map_sample_to_subset.loc[x].values[0])
+    # confirm that x_data has what we need (i.e. that we have xdata for every sample)
+    assert df.columns.astype(str).equals(sample_x_matrix.index.astype(str))
+    # ensure we are in matched order
+    x_data = sample_x_matrix.copy()
+    x_data.index = x_data.index.astype(str)
+    x_data = x_data.loc[df.columns.astype(str)]
+    
+    # confirm that cell_features has what we need
+    assert all(c in cell_features.index.values for c in x_data.columns)
+
+    # filter cell features to current cell types, and order it in the same order
+    cell_features_df = cell_features.loc[x_data.columns].copy()
+    # fill blanks
+    cell_features_df.fillna(0, inplace=True)
+    # remove any markers that are not present in current cell types -- i.e. any columns that have all 0s
+    cell_features_df = cell_features_df.loc[:, (cell_features_df != 0).any(axis=0)]
 
     # create gene and sample IDs
     training_df['new_sample_cat'] = training_df['sample_name'].astype('category')
@@ -44,13 +59,19 @@ def make_training_stan_dict(df, map_sample_to_subset):
     map_gene_name_to_id = training_df[['gene_name', 'new_gene_id']].drop_duplicates().set_index('gene_name')
     assert map_gene_name_to_id.shape[0] == training_df.gene_name.nunique()
 
-    stan_data_dict = models.prep_stan_data(
-        sample_df=training_df,
-        test_df=None,
-        by='SubSet',
-        #y=models['est_counts'].astype(int).values, # in case want to replace with another column -- do it here
-    )
-    assert all(type(t) == np.int64 for t in stan_data_dict['y']) # required, because negative binomial distribution..
+    stan_data_dict = {
+        'N': len(training_df.index), # total number of observations (GxS)
+        'G': len(training_df.new_gene_id.unique()), # number of genes
+        'S': len(training_df.new_sample_id.unique()), # number of samples
+        'C': x_data.shape[1], # number of subsets
+        'gene': training_df.new_gene_id.values, # gene ID value for each of the N observations
+        'sample': training_df.new_sample_id.values, # sample ID value for each of the N observations
+        'x': x_data, # S x C matrix
+        'y': training_df.est_counts.astype(int).values, # very important to make it int -- because negative binomial distribution
+        'cell_features': cell_features, # C x M matrix
+        'M': cell_features.shape[1],
+    }
+
     return stan_data_dict, map_gene_name_to_id
 
 
@@ -127,7 +148,8 @@ if __name__ == '__main__':
 
 
     parser.add_argument('--train_samples', required=True, help='training matrix filename')
-    parser.add_argument('--train_celltypes', required=True, help='map from training samples to subsets')
+    parser.add_argument('--train_xdata', required=True, help='map from training samples to subsets (xdata design matrix')
+    parser.add_argument('--train_cellfeatures', required=True, help='cell features matrix')
     parser.add_argument('--test_samples', required=True, help='test matrix filename (to be deconvolved)')
     parser.add_argument('--n_chains', default=4, help='number of MCMC chains')
     parser.add_argument('--output_name', required=True, help='prefix for output files (include chunk number here!)')
@@ -136,16 +158,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    # load in train and test files
+    ## load in train and test files
+    # train_df: Genes x Samples
     train_df = pd.read_csv(args.train_samples, index_col=0, sep='\t')
     train_df.columns = train_df.columns.astype(str) # so that compatible with train_sample_map's sample_name
-    train_sample_map = pd.read_csv(args.train_celltypes, sep='\t')
-    assert train_sample_map['sample_name'].nunique() == train_sample_map['sample_name'].count()
-    train_sample_map['sample_name'] = train_sample_map['sample_name'].astype(str)
-    train_sample_map.set_index('sample_name', inplace=True)
+
+    # xdata: Samples x Subsets
+    xdata = pd.read_csv(args.train_xdata, sep='\t')
+
+    # cell features: Subsets x Markers
+    cell_features = pd.read_csv(args.train_cellfeatures, sep='\t', index_col=0)
+
     test_df = pd.read_csv(args.test_samples, index_col=0, sep='\t')
 
-    # confirm they have exactly the same genes
+    # confirm that train and test expression have exactly the same genes
     assert len(set(train_df.index.values).symmetric_difference(set(test_df.index.values))) == 0
 
     # create stan data dicts, recoding sample IDs
