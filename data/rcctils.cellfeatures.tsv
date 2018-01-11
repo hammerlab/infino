@@ -1,0 +1,5 @@
+SubSet	CD38	CD204	PD-1
+Macrophage CD38- CD204-	0	0	0
+Macrophage CD38+ CD204+	1	1	0
+T PD-1-	0	0	0
+T PD-1+	0	0	1

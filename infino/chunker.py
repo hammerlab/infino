@@ -45,7 +45,7 @@ def chunker(input_name, output_fname_template, pagesize, min_group_size=1):
     return chunks, output_fnames
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', required=True,
                         help="path to test data (tab delimited genes x samples)")
@@ -71,3 +71,6 @@ if __name__ == '__main__':
         else:
             print(output_fname, " -- %d samples (%s, ..., %s)" %
                   (len(chunk), chunk[0], chunk[-1]))
+
+if __name__ == '__main__':
+    main()

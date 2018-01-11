@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import subprocess
 import argparse
+from .run_stansummary import stansummary
 
 # import pdb; pdb.set_trace()
 
@@ -140,7 +141,7 @@ def announce_progress(progress_str, log_file_handler, chain_id):
     print(log_text)
     log_file_handler.write(log_text + '\n')
 
-if __name__ == '__main__':
+def main():
 
     # load command line arguments
 
@@ -263,5 +264,6 @@ if __name__ == '__main__':
 
     # TODO: print timing details from end of chain sampling log files?
 
-
+if __name__ == '__main__':
+    main()
 
