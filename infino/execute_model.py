@@ -61,6 +61,8 @@ def make_training_stan_dict(df, sample_x_matrix, cell_features):
     map_gene_name_to_id = training_df[['gene_name', 'new_gene_id']].drop_duplicates().set_index('gene_name')
     assert map_gene_name_to_id.shape[0] == training_df.gene_name.nunique()
 
+    x_data_reshaped = x_data.loc[training_df.sample_name.values] # it's really N x C -- and the N has to be arranged following the 'sample' list 
+
     stan_data_dict = {
         'N': len(training_df.index), # total number of observations (GxS)
         'G': len(training_df.new_gene_id.unique()), # number of genes
@@ -68,11 +70,28 @@ def make_training_stan_dict(df, sample_x_matrix, cell_features):
         'C': x_data.shape[1], # number of subsets
         'gene': training_df.new_gene_id.values, # gene ID value for each of the N observations
         'sample': training_df.new_sample_id.values, # sample ID value for each of the N observations
-        'x': x_data, # S x C matrix
+        #'x': x_data, # S x C matrix 
+        'x': x_data_reshaped, # N x C matrix
         'y': training_df.est_counts.astype(int).values, # very important to make it int -- because negative binomial distribution
         'cell_features': cell_features, # C x M matrix
         'M': cell_features.shape[1],
     }
+
+
+    assert len(stan_data_dict['y']) == stan_data_dict['N'] # int<lower=0> y[N]; // count/tpm for each obs
+    # y must correspond: sample_y[sample[n], gene[n]] = y[n];
+    # this is guaranteed in our construction because we take G, S, y directly from `training_df` without any reordering
+
+    # confirm vector<lower=0, upper=1>[C] x[N];
+    assert stan_data_dict['x'].shape == (stan_data_dict['N'], stan_data_dict['C'])
+    # next two assertions removed because they assume that our sample IDs go 1,1,1,1,1,1,12,12,12,12,12,12,.. as opposed to 1,12,3,4,5,1,12,3,4,5..
+    #assert np.array_equal(stan_data_dict['x'][0,:], stan_data_dict['x'][1,:])
+    #assert np.array_equal(stan_data_dict['x'][stan_data_dict['G'],:], stan_data_dict['x'][stan_data_dict['G']+1,:])
+    # choose two rows that should belong to the same sample. make sure they're identical
+    assert np.array_equal(
+        stan_data_dict['x'].iloc[np.where(stan_data_dict['sample'] == stan_data_dict['sample'].max())[0][0]].values,
+        stan_data_dict['x'].iloc[np.where(stan_data_dict['sample'] == stan_data_dict['sample'].max())[0][-1]].values
+    )
 
     return stan_data_dict, map_gene_name_to_id
 
