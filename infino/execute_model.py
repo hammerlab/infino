@@ -81,6 +81,7 @@ def make_training_stan_dict(df, sample_x_matrix, cell_features):
     assert len(stan_data_dict['y']) == stan_data_dict['N'] # int<lower=0> y[N]; // count/tpm for each obs
     # y must correspond: sample_y[sample[n], gene[n]] = y[n];
     # this is guaranteed in our construction because we take G, S, y directly from `training_df` without any reordering
+    assert all(stan_data_dict['y'] >= 0), 'Values must be non-negative'
 
     # confirm vector<lower=0, upper=1>[C] x[N];
     assert stan_data_dict['x'].shape == (stan_data_dict['N'], stan_data_dict['C'])
