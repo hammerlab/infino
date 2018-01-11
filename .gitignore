@@ -7,7 +7,6 @@ model6.4_negbinom_matrix_correlation_features_oos_optim_otherbucket.hpp
 model6.5_negbinom_matrix_correlation_features_oos_optim_otherbucket_samplevariance
 model6.5_negbinom_matrix_correlation_features_oos_optim_otherbucket_samplevariance.hpp
 
-
 .DS_Store
 # Byte-compiled / optimized / DLL files
 __pycache__/

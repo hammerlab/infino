@@ -11,6 +11,7 @@ import pandas as pd
 import subprocess
 import argparse
 from .run_stansummary import stansummary
+import pickle
 
 # import pdb; pdb.set_trace()
 
@@ -124,8 +125,14 @@ def generate_chain_command(**kwargs):
     seed_fname = "{experiment_name}.seed.{chain_id}.txt".format(**kwargs) # output seed for reproducibility
     kwargs['output_fname'] = sample_log_fname
     kwargs['echo'] = 'echo' if kwargs['dry_run'] else ''
+    """
+    *very deliberately* not saving out warmups.
+    We need to be super careful to ensure we absolutely drop warmups when necessary and don't drop any real samples ever.
+    Since this is risky, we set cmdstan to not output warmups.
+    Thus that there is no need for an end user to remember that they must calculate and pass n_warmups=n_total/2 to analyze-infino to get the right results.
+    """
     command_template = """
-        {echo} {modelexe} method=sample num_samples=1000 num_warmup=1000 save_warmup=0 thin=1 \\
+        {echo} {modelexe} method=sample num_samples={num_samples} num_warmup={num_warmup} save_warmup=0 thin=1 \\
         random seed={seed} \\
         id={chain_id} data file={data_fname} \\
         output file={output_fname} refresh=25
@@ -157,6 +164,8 @@ def main():
     parser.add_argument('--output_name', required=True, help='prefix for output files (include chunk number here!)')
     parser.add_argument('--model_executable', required=True, help='compiled stan model')
     parser.add_argument('--dry_run', action='store_true', default=False, help="don't run expensive stan fit commands, but do everything else")
+    parser.add_argument('--num_samples', default=1000, type=int, help='number of saved samples')
+    parser.add_argument('--num_warmup', default=1000, type=int, help='number of warmup samples (NOT saved)')
 
     args = parser.parse_args()
 
@@ -208,7 +217,9 @@ def main():
             chain_id=i+1,
             modelexe = args.model_executable,
             data_fname = data_fname,
-            dry_run = args.dry_run
+            dry_run = args.dry_run,
+            num_samples=args.num_samples,
+            num_warmup=args.num_warmup
         )
         chains.append({
                 'chain_id': i+1,
@@ -216,7 +227,9 @@ def main():
                 'sample_log': sample_log_fname,
                 'stdout_log': stdout_fname,
                 'seed': seed,
-                'seed_fname': seed_fname
+                'seed_fname': seed_fname,
+                'num_samples': args.num_samples,
+                'num_warmup': args.num_warmup
             }
         )
 
@@ -254,8 +267,9 @@ def main():
             pass
         
         # get cmdstan exit code
-        announce_progress("Execution completed, return code: %d" % chain['proc'].returncode, chain['stdout_file_handler'], chain['chain_id'])
-        
+        chain['exit_code'] = chain['proc'].returncode
+        announce_progress("Execution completed, return code: %d" % chain['exit_code'], chain['stdout_file_handler'], chain['chain_id'])
+
         # close out the file handler
         chain['stdout_file_handler'].close()
 
@@ -269,6 +283,14 @@ def main():
     )
 
     # TODO: print timing details from end of chain sampling log files?
+
+    # pickle out the chain metadata just in case.
+    for c in chains:
+        # remove unpickleables
+        del c['proc']
+        del c['stdout_file_handler']
+    pickle.dump({'chains': chains, 'cliargs': args}, open('%s.chain_metadata.pkl' % args.output_name, 'wb'))
+
 
 if __name__ == '__main__':
     main()
