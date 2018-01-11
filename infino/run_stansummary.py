@@ -2,12 +2,12 @@ import argparse
 import subprocess
 
 
-def stansummary(output_fname, input_names):
+def stansummary(output_fname, input_names, dry_run=False):
     input_names_concat = ' '.join(input_names)
-    # TODO: remove the "echo"
-    command = """echo stansummary --csv_file={output_fname} {input_names_concat} > /dev/null;""".format(
+    command = """{echo} stansummary --csv_file={output_fname} {input_names_concat} > /dev/null;""".format(
         output_fname=output_fname,
-        input_names_concat=input_names_concat
+        input_names_concat=input_names_concat,
+        echo='echo' if dry_run else ''
     )
     print(command)
     try:
@@ -32,12 +32,17 @@ def main():
     parser.add_argument('--sample_log', action='append', required=True, help="sampling log filename(s)")
     parser.add_argument('--output_file', required=True, help='output file name')
     parser.add_argument('--exclude_broken_chains', action='store_true', help="detect and exclude broken chains")
+    parser.add_argument('--dry_run', action='store_true', default=False, help="don't run the actual stansummary command, but do everything else")
     
     args = parser.parse_args()
     
     # TODO: implement exclude_broken_chains
     
-    stansummary(args.output_file, args.sample_log)
+    stansummary(
+        output_fname = args.output_file,
+        input_names = args.sample_log,
+        dry_run = args.dry_run
+    )
 
 if __name__ == '__main__':
     main()

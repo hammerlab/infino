@@ -123,9 +123,9 @@ def generate_chain_command(**kwargs):
     stdout_fname = "{experiment_name}.stdout.{chain_id}.txt".format(**kwargs)
     seed_fname = "{experiment_name}.seed.{chain_id}.txt".format(**kwargs) # output seed for reproducibility
     kwargs['output_fname'] = sample_log_fname
-    # TODO: remove "echo"
+    kwargs['echo'] = 'echo' if kwargs['dry_run'] else ''
     command_template = """
-        echo {modelexe} method=sample num_samples=1000 num_warmup=1000 save_warmup=0 thin=1 \\
+        {echo} {modelexe} method=sample num_samples=1000 num_warmup=1000 save_warmup=0 thin=1 \\
         random seed={seed} \\
         id={chain_id} data file={data_fname} \\
         output file={output_fname} refresh=25
@@ -156,6 +156,7 @@ def main():
     parser.add_argument('--n_chains', default=4, help='number of MCMC chains')
     parser.add_argument('--output_name', required=True, help='prefix for output files (include chunk number here!)')
     parser.add_argument('--model_executable', required=True, help='compiled stan model')
+    parser.add_argument('--dry_run', action='store_true', default=False, help="don't run expensive stan fit commands, but do everything else")
 
     args = parser.parse_args()
 
@@ -177,7 +178,7 @@ def main():
     assert len(set(train_df.index.values).symmetric_difference(set(test_df.index.values))) == 0
 
     # create stan data dicts, recoding sample IDs
-    train_dict, map_gene_name_to_id = make_training_stan_dict(train_df, train_sample_map)
+    train_dict, map_gene_name_to_id = make_training_stan_dict(train_df, xdata, cell_features)
     test_dict, map_sample_name_to_id = make_test_stan_dict(test_df, map_gene_name_to_id)
 
     # output sample ID test chunk map
@@ -206,7 +207,8 @@ def main():
             experiment_name=args.output_name,
             chain_id=i+1,
             modelexe = args.model_executable,
-            data_fname = data_fname
+            data_fname = data_fname,
+            dry_run = args.dry_run
         )
         chains.append({
                 'chain_id': i+1,
@@ -262,7 +264,8 @@ def main():
     # since we got here, all chains must have written proper logs -- so we will avoid the bug of stansummary erroring out in the case of broken chains
     stansummary(
         output_fname="{experiment_name}.stansummary.csv".format(experiment_name=args.output_fname),
-        input_names=[chain['sample_log'] for chain in chains]
+        input_names=[chain['sample_log'] for chain in chains],
+        dry_run=args.dry_run
     )
 
     # TODO: print timing details from end of chain sampling log files?

@@ -20,5 +20,5 @@ setup(name='infino',
         	'execute-model=infino.execute_model:main',
         	'run-stansummary=infino.run_stansummary:main'
         ],
-      }
+      },
       zip_safe=False)
