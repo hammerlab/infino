@@ -165,7 +165,11 @@ def announce_progress(progress_str, log_file_handler, chain_id):
     print progress to this process's stdout and to [log_file_handler]
     prefix with [chain_id]
     """
-    log_text = '[Chain %d] %s' % (chain_id, progress_str)
+    #log_text = '[Chain %d] %s' % (chain_id, progress_str)
+
+    # progress_str may have multiple lines in it
+    log_text = '\n'.join(['[Chain %d] %s' % (chain_id, progress_str_part) for progress_str_part in progress_str.split('\n')])
+
     print(log_text)
     log_file_handler.write(log_text + '\n')
 
@@ -273,7 +277,7 @@ def main():
     while any(chain['proc'].returncode is None for chain in chains):
         for chain in chains:
             try:
-                announce_progress(str(chain['proc'].communicate()), chain['stdout_file_handler'], chain['chain_id'])
+                announce_progress(str(chain['proc'].communicate()[0].decode('utf-8').strip()), chain['stdout_file_handler'], chain['chain_id'])
             except Exception as e:
                 print("Error getting stdout/err from chain %d:" % chain['chain_id'], e, "-- continuing.")
 
@@ -281,7 +285,7 @@ def main():
     for chain in chains:
         # flush any announcements
         try:
-            announce_progress(str(chain['proc'].communicate()), chain['stdout_file_handler'], chain['chain_id'])
+            announce_progress(str(chain['proc'].communicate()[0].decode('utf-8').strip()), chain['stdout_file_handler'], chain['chain_id'])
         except Exception as e:
             # i think this actually is supposed to fail always?
             pass
@@ -299,7 +303,8 @@ def main():
     stansummary(
         output_fname="{experiment_name}.stansummary.csv".format(experiment_name=args.output_name),
         input_names=[chain['sample_log'] for chain in chains],
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        verbose=True # print return code even if not error
     )
 
     # TODO: print timing details from end of chain sampling log files?
@@ -310,6 +315,8 @@ def main():
         del c['proc']
         del c['stdout_file_handler']
     pickle.dump({'chains': chains, 'cliargs': args}, open('%s.chain_metadata.pkl' % args.output_name, 'wb'))
+
+    print("Run complete. Chain metadata pickled out.")
 
 
 if __name__ == '__main__':

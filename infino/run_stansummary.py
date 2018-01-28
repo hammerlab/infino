@@ -2,7 +2,7 @@ import argparse
 import subprocess
 
 
-def stansummary(output_fname, input_names, dry_run=False):
+def stansummary(output_fname, input_names, dry_run=False, verbose=False):
     input_names_concat = ' '.join(input_names)
     command = """{echo} stansummary --csv_file={output_fname} {input_names_concat} > /dev/null;""".format(
         output_fname=output_fname,
@@ -22,8 +22,8 @@ def stansummary(output_fname, input_names, dry_run=False):
     except subprocess.CalledProcessError as err:
         print('ERROR:', err)
         return
-    if completed.returncode != 0:
-        print('return code:', completed.returncode)
+    if completed.returncode != 0 or verbose: # always print return code if verbose
+        print('stansummary completed, return code:', completed.returncode)
 
 
 
@@ -33,6 +33,7 @@ def main():
     parser.add_argument('--output_file', required=True, help='output file name')
     parser.add_argument('--exclude_broken_chains', action='store_true', help="detect and exclude broken chains")
     parser.add_argument('--dry_run', action='store_true', default=False, help="don't run the actual stansummary command, but do everything else")
+    parser.add_argument('--verbose', action='store_true', default=False, help="print return code even if successful (by default quiet)")
     
     args = parser.parse_args()
     
@@ -41,7 +42,8 @@ def main():
     stansummary(
         output_fname = args.output_file,
         input_names = args.sample_log,
-        dry_run = args.dry_run
+        dry_run = args.dry_run,
+        verbose = args.verbose
     )
 
 if __name__ == '__main__':
