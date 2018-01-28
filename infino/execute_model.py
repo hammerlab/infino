@@ -152,7 +152,7 @@ def generate_chain_command(**kwargs):
     method = kwargs.get('method', '')
     if method.lower() == 'vi':
         # method=variational iter=10000 output_samples=1000
-        method_str = "method=variational iter={adjusted_iter} num_warmup={adjusted_output_samples}".format(
+        method_str = "method=variational iter={adjusted_iter} output_samples={adjusted_output_samples}".format(
             adjusted_iter = kwargs['num_samples'] + kwargs['num_warmup'],
             adjusted_output_samples = kwargs['num_samples']
         )
