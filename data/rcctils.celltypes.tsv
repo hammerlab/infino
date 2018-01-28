@@ -1,0 +1,5 @@
+sample_description	celltype	rollup
+CD204-negative, CD38-negative-macrophage	Macrophage CD38- CD204-	macrophage
+CD204-positive, CD38-positive-macrophage	Macrophage CD38+ CD204+	macrophage
+PD-1-negative-T cell	T PD-1-	T
+PD-1-positive-T cell	T PD-1+	T
