@@ -296,7 +296,7 @@ def main():
     while any(chain['proc'].returncode is None for chain in chains):
         for chain in chains:
             try:
-                announce_progress(str(chain['proc'].communicate()[0].decode('utf-8').strip()), chain['stdout_file_handler'], chain['chain_id'])
+                announce_progress(str(chain['proc'].communicate()[0].strip()), chain['stdout_file_handler'], chain['chain_id'])
             except Exception as e:
                 print("Error getting stdout/err from chain %d:" % chain['chain_id'], e, "-- continuing.")
 
@@ -304,7 +304,7 @@ def main():
     for chain in chains:
         # flush any announcements
         try:
-            announce_progress(str(chain['proc'].communicate()[0].decode('utf-8').strip()), chain['stdout_file_handler'], chain['chain_id'])
+            announce_progress(str(chain['proc'].communicate()[0].strip()), chain['stdout_file_handler'], chain['chain_id'])
         except Exception as e:
             # i think this actually is supposed to fail always?
             pass
