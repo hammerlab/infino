@@ -140,9 +140,24 @@ generate_seed = lambda : random.randint(0, MAX_UINT)
 
 
 def generate_chain_command(**kwargs):
+    """
+    generates the cmdstan command
+    """
     sample_log_fname = "{experiment_name}.samples.{chain_id}.csv".format(**kwargs)
     stdout_fname = "{experiment_name}.stdout.{chain_id}.txt".format(**kwargs)
     seed_fname = "{experiment_name}.seed.{chain_id}.txt".format(**kwargs) # output seed for reproducibility
+
+    # method is optional, but if it's VI then we will switch to variational inference
+    method_str = "method=sample num_samples={num_samples} num_warmup={num_warmup} save_warmup=0 thin=1".format(**kwargs)
+    method = kwargs.get('method', '')
+    if method.lower() == 'vi':
+        # method=variational iter=10000 output_samples=1000
+        method_str = "method=variational iter={adjusted_iter} num_warmup={adjusted_output_samples}".format(
+            adjusted_iter = kwargs['num_samples'] + kwargs['num_warmup'],
+            adjusted_output_samples = kwargs['num_samples']
+        )
+    
+    kwargs['method_str'] = method_str 
     kwargs['output_fname'] = sample_log_fname
     kwargs['echo'] = 'echo' if kwargs['dry_run'] else ''
     """
@@ -152,7 +167,7 @@ def generate_chain_command(**kwargs):
     Thus that there is no need for an end user to remember that they must calculate and pass n_warmups=n_total/2 to analyze-infino to get the right results.
     """
     command_template = """
-        {echo} {modelexe} method=sample num_samples={num_samples} num_warmup={num_warmup} save_warmup=0 thin=1 \\
+        {echo} {modelexe} {methodstr} \\
         random seed={seed} \\
         id={chain_id} data file={data_fname} \\
         output file={output_fname} refresh=25
@@ -190,6 +205,8 @@ def main():
     parser.add_argument('--dry_run', action='store_true', default=False, help="don't run expensive stan fit commands, but do everything else")
     parser.add_argument('--num_samples', default=1000, type=int, help='number of saved samples')
     parser.add_argument('--num_warmup', default=1000, type=int, help='number of warmup samples (NOT saved)')
+    parser.add_argument('--vi', dest='method', action='store_const', const='vi', default='nuts',
+        help="run VI instead of NUTS (recommendation: 1000 samples, 9000 warmup")
 
     args = parser.parse_args()
 
@@ -243,7 +260,8 @@ def main():
             data_fname = data_fname,
             dry_run = args.dry_run,
             num_samples=args.num_samples,
-            num_warmup=args.num_warmup
+            num_warmup=args.num_warmup,
+            method=args.method
         )
         chains.append({
                 'chain_id': i+1,
@@ -253,7 +271,8 @@ def main():
                 'seed': seed,
                 'seed_fname': seed_fname,
                 'num_samples': args.num_samples,
-                'num_warmup': args.num_warmup
+                'num_warmup': args.num_warmup,
+                'method': args.method
             }
         )
 
