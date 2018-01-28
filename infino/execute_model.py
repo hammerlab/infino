@@ -167,7 +167,7 @@ def generate_chain_command(**kwargs):
     Thus that there is no need for an end user to remember that they must calculate and pass n_warmups=n_total/2 to analyze-infino to get the right results.
     """
     command_template = """
-        {echo} {modelexe} {methodstr} \\
+        {echo} {modelexe} {method_str} \\
         random seed={seed} \\
         id={chain_id} data file={data_fname} \\
         output file={output_fname} refresh=25
