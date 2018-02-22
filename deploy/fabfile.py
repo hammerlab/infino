@@ -28,8 +28,8 @@ env.use_ssh_config=True
 #env.gateway='demeter1'
 env.hosts = [
     'infino-run-1.us-east1-b.pici-hammerlab',
-    # 'infino-run-2.us-east1-b.pici-hammerlab',
-    # 'infino-run-3.us-east1-b.pici-hammerlab',
+    'infino-run-2.us-east1-b.pici-hammerlab',
+    'infino-run-3.us-east1-b.pici-hammerlab',
     ]
 env.forward_agent=True # so git clone works with private repo
 

@@ -1,3 +1,5 @@
+Make sure the data is what we've pinned: `./verify_data.sh`
+
 Install Fabric: `pip install -r requirements.txt && fab --version`
 
 Follow runbook
