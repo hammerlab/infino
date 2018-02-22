@@ -46,9 +46,12 @@ gcloud beta compute --project "pici-hammerlab" instances create "infino-run-3" \
 If you make a mistake and need to reset fully:
 
 ```
-gcloud compute instances stop [machine names here];
-gcloud compute instances delete --delete-disks=all --quiet [machine names here];
+# think before running these!
+gcloud compute instances stop infino-run-1 infino-run-2 infino-run-3; 
+gcloud compute instances delete --delete-disks=all --quiet infino-run-1 infino-run-2 infino-run-3;
 ```
+
+# Set up SSH connections
 
 Then: `gcloud compute config-ssh` (makes edits to `~/.ssh/config`). After this, you can access any node directly with `ssh infino-run-X.us-east1-b.pici-hammerlab`
 
@@ -70,7 +73,11 @@ Configure per-host tasks in `host_task_map.py` -- make sure to update `map_host_
 
 (`-P` means [run in parallel](http://docs.fabfile.org/en/1.13/usage/parallel.html))
 
+The sanity check can be hard to see in the logs because it's running in parallel across nodes. So just run it again and make sure each one has `0` outputted: `fab -- cat infino/out/test_remote_run.txt`
+
 # Launch main computation
+
+Verify data versions: `fab -- 'cd infino/deploy && ./verify_data.sh'` (should see all OKs)
 
 Dry run: `fab run_infino`
 

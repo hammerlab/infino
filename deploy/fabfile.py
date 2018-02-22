@@ -87,8 +87,8 @@ def clone_repo():
     with cd('infino'):
         run("git checkout develop")
     # clone docker
-    run("gcloud docker -- pull gcr.io/pici-hammerlab/infino-env")
-    run("docker tag gcr.io/pici-hammerlab/infino-env hammerlab/infino-docker:develop")
+    run("gcloud docker -- pull gcr.io/pici-hammerlab/infino-env:develop")
+    run("docker tag gcr.io/pici-hammerlab/infino-env:develop hammerlab/infino-docker:develop")
 
 @task
 def prep_run():
@@ -189,10 +189,12 @@ def clean_up_docker_containers(dryrun='1'):
     if not env.host_string in map_host_to_task.keys():
         print("MISSING!")
         return
+    shell_script = 'docker rm %s' % map_host_to_docker_name[env.host_string]
+    print(shell_script)
     if dryrun == '0':
-        shell_script = 'docker rm %s' % map_host_to_docker_name[env.host_string]
-        print(shell_script)
         run(shell_script)
+    else:
+        print('didnt run')
 
 @task
 def docker_logs():
