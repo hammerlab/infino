@@ -50,6 +50,8 @@ def make_training_stan_dict(df, sample_x_matrix, cell_features):
     # remove any markers that are not present in current cell types -- i.e. any columns that have all 0s
     cell_features_df = cell_features_df.loc[:, (cell_features_df != 0).any(axis=0)]
 
+    assert cell_features_df.shape[0] == x_data.shape[1], "X data + Cell Features filtering failed"
+
     # create gene and sample IDs
     training_df['new_sample_cat'] = training_df['sample_name'].astype('category')
     training_df['new_sample_id'] = training_df['new_sample_cat'].cat.codes+1
@@ -73,8 +75,8 @@ def make_training_stan_dict(df, sample_x_matrix, cell_features):
         #'x': x_data, # S x C matrix 
         'x': x_data_reshaped, # N x C matrix
         'y': training_df.est_counts.astype(int).values, # very important to make it int -- because negative binomial distribution
-        'cell_features': cell_features, # C x M matrix
-        'M': cell_features.shape[1],
+        'cell_features': cell_features_df, # C x M matrix
+        'M': cell_features_df.shape[1],
     }
 
 
